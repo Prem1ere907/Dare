@@ -16,7 +16,7 @@
             overflow: hidden;
         }
 
-        /* container holding all user avatars */
+        
         .users-container {
             display: flex;
             gap: 40px;
@@ -37,7 +37,7 @@
         }
 
         .avatar-container.selected {
-            /* active but no visual highlight when fade is disabled */
+            
         }
 
         .avatar-container.highlight {
@@ -71,7 +71,7 @@
         }
 
         .speaking .ring {
-            border-color: #43b581; /* Discord Green */
+            border-color: #43b581; 
         }
 
         #start-btn {
@@ -88,7 +88,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
 
-        /* controls for adding users */
+        
         #controls {
             position: fixed;
             bottom: 30px;
@@ -98,7 +98,7 @@
             gap: 10px;
         }
 
-        /* settings panel in top right */
+        
         #settings-panel {
             position: fixed;
             top: 10px;
@@ -116,7 +116,7 @@
             font-size: 16px;
         }
 
-        /* custom slider toggle for fade */
+        
         .switch {
             position: relative;
             display: inline-block;
@@ -197,7 +197,7 @@
 <body>
 
     <div id="users" class="users-container">
-        <!-- avatars will be generated here -->
+        
     </div>
 
     <div id="controls">
@@ -228,8 +228,8 @@
         const settingsPanel = document.getElementById('settings-panel');
         const fadeToggle = document.getElementById('fade-toggle');
 
-        let activeContainer = null; // which avatar is currently "speaking"
-        let nextUserId = 1; // used to assign profile pictures
+        let activeContainer = null;
+        let nextUserId = 1;
         let fadeEnabled = true;
 
         function createAvatar() {
@@ -241,8 +241,8 @@
             ring.className = 'ring';
             const avatar = document.createElement('div');
             avatar.className = 'avatar';
-            // assign a profile image based on the nextUserId counter
-            avatar.style.backgroundImage = `url('user${nextUserId}.png')`;
+
+            avatar.style.backgroundImage = `url('img/user${nextUserId}.png')`;
             container.dataset.userId = nextUserId;
             nextUserId++;
 
@@ -250,7 +250,7 @@
             container.appendChild(avatar);
             usersContainer.appendChild(container);
 
-            // if nothing selected yet, pick this one
+
             if (!activeContainer) {
                 selectUser(container);
             }
@@ -268,7 +268,7 @@
             }
         }
 
-        // adjust number of users to match the input value
+
         function updateUsers() {
             const desired = parseInt(userCountInput.value, 10) || 0;
             const current = usersContainer.children.length;
@@ -277,7 +277,7 @@
                     createAvatar();
                 }
             } else if (desired < current) {
-                // remove extras from the end
+
                 for (let i = 0; i < current - desired; i++) {
                     const last = usersContainer.lastElementChild;
                     if (last === activeContainer) {
@@ -285,7 +285,7 @@
                     }
                     usersContainer.removeChild(last);
                 }
-                // if the active user was removed and there are still avatars, pick the first one
+
                 if (!activeContainer && usersContainer.children.length > 0) {
                     selectUser(usersContainer.children[0]);
                 }
@@ -298,7 +298,7 @@
         });
         fadeToggle.addEventListener('change', () => {
             fadeEnabled = fadeToggle.checked;
-            // update currently selected avatar appearance
+
             if (activeContainer) {
                 activeContainer.classList.remove('highlight');
                 if (fadeEnabled) {
@@ -307,7 +307,7 @@
             }
         });
 
-        // create initial avatar (will be auto‑selected)
+
         createAvatar();
 
         async function initAudio() {
