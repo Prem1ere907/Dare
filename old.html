@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Voice Detector + Noise Suppression</title>
+    <style>
+        body {
+            background-color: #2f3136;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The .PNG Avatar Circle */
+        .avatar {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background-image: url('YOUR_IMAGE_HERE.png'); /* <--- PUT YOUR PNG LINK HERE */
+            background-size: cover;
+            background-position: center;
+            background-color: #5865f2; 
+            z-index: 2;
+        }
+
+        /* The Speaking Ring */
+        .ring {
+            position: absolute;
+            width: 148px;
+            height: 148px;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            transition: border-color 0.15s ease;
+            z-index: 1;
+        }
+
+        /* Speaking State */
+        .speaking .ring {
+            border-color: #43b581; /* Discord Green */
+        }
+
+        #start-btn {
+            position: absolute;
+            bottom: 30px;
+            padding: 12px 24px;
+            background: #43b581;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container" class="avatar-container">
+        <div class="ring"></div>
+        <div class="avatar" id="avatar"></div>
+    </div>
+
+    <button id="start-btn">Enable Microphone</button>
+
+    <script>
+        const container = document.getElementById('container');
+        const startBtn = document.getElementById('start-btn');
+
+        async function initAudio() {
+            try {
+                // 1. Request Mic with Native Noise Suppression
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true, // Enables browser-level noise filtering
+                        autoGainControl: true
+                    } 
+                });
+
+                startBtn.style.display = 'none';
+                const audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+
+                // 2. Add a High-Pass Filter to block low-end background noise (fan/hum)
+                const filter = audioContext.createBiquadFilter();
+                filter.type = "highpass";
+                filter.frequency.value = 150; // Blocks sounds below 150Hz (typical for speech)
+
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+
+                // Connect: Mic -> Filter -> Analyser
+                source.connect(filter);
+                filter.connect(analyser);
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                function detectVoice() {
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    let volume = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        volume += dataArray[i];
+                    }
+                    const averageVolume = volume / dataArray.length;
+
+                    // Threshold: Increase this number if background noise still triggers it
+                    if (averageVolume > 25) {
+                        container.classList.add('speaking');
+                    } else {
+                        container.classList.remove('speaking');
+                    }
+
+                    requestAnimationFrame(detectVoice);
+                }
+
+                detectVoice();
+            } catch (err) {
+                alert("Microphone access is required for this to work.");
+            }
+        }
+
+        startBtn.addEventListener('click', initAudio);
+    </script>
+</body>
+</html>

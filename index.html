@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord VC Mock</title>
+    <style>
+        body {
+            background-color: #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* container holding all user avatars */
+        .users-container {
+            display: flex;
+            gap: 40px;
+            transition: all 0.3s ease;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+
+        .avatar-container.selected {
+            /* active but no visual highlight when fade is disabled */
+        }
+
+        .avatar-container.highlight {
+            outline: 3px solid #7289da;
+            animation: fadeOutline 0.8s forwards;
+        }
+
+        @keyframes fadeOutline {
+            from { outline-color: #7289da; }
+            to { outline-color: transparent; }
+        }
+
+        .avatar {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            background-color: #5865f2; 
+            z-index: 2;
+        }
+
+        .ring {
+            position: absolute;
+            width: 148px;
+            height: 148px;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            transition: border-color 0.15s ease;
+            z-index: 1;
+        }
+
+        .speaking .ring {
+            border-color: #43b581; /* Discord Green */
+        }
+
+        #start-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 12px 24px;
+            background: #5865f2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        /* controls for adding users */
+        #controls {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* settings panel in top right */
+        #settings-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+        }
+
+        #settings-toggle {
+            background: #5865f2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        /* custom slider toggle for fade */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 24px;
+            vertical-align: middle;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #5865f2;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(16px);
+        }
+
+        #settings-content {
+            display: none;
+            margin-top: 8px;
+            background: #ffffff;
+            color: #000000;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            min-width: 120px;
+        }
+
+        #settings-panel.open #settings-content {
+            display: block;
+        }
+
+        #controls input[type=number] {
+            width: 60px;
+            padding: 4px;
+        }
+
+        #controls button {
+            padding: 6px 12px;
+            cursor: pointer;
+            background: #5865f2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="users" class="users-container">
+        <!-- avatars will be generated here -->
+    </div>
+
+    <div id="controls">
+        <label for="user-count">Users:</label>
+        <input type="number" id="user-count" min="1" value="1">
+        <button id="add-btn">Update</button>
+    </div>
+
+    <div id="settings-panel">
+        <button id="settings-toggle">Settings</button>
+        <div id="settings-content">
+            <label class="switch">
+                <input type="checkbox" id="fade-toggle" checked>
+                <span class="slider"></span>
+            </label>
+            <span>Fade outline</span>
+        </div>
+    </div>
+
+    <button id="start-btn">Enable Microphone</button>
+
+    <script>
+        const usersContainer = document.getElementById('users');
+        const startBtn = document.getElementById('start-btn');
+        const addBtn = document.getElementById('add-btn');
+        const userCountInput = document.getElementById('user-count');
+        const settingsToggle = document.getElementById('settings-toggle');
+        const settingsPanel = document.getElementById('settings-panel');
+        const fadeToggle = document.getElementById('fade-toggle');
+
+        let activeContainer = null; // which avatar is currently "speaking"
+        let nextUserId = 1; // used to assign profile pictures
+        let fadeEnabled = true;
+
+        function createAvatar() {
+            const container = document.createElement('div');
+            container.className = 'avatar-container';
+            container.addEventListener('click', () => selectUser(container));
+
+            const ring = document.createElement('div');
+            ring.className = 'ring';
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            // assign a profile image based on the nextUserId counter
+            avatar.style.backgroundImage = `url('user${nextUserId}.png')`;
+            container.dataset.userId = nextUserId;
+            nextUserId++;
+
+            container.appendChild(ring);
+            container.appendChild(avatar);
+            usersContainer.appendChild(container);
+
+            // if nothing selected yet, pick this one
+            if (!activeContainer) {
+                selectUser(container);
+            }
+            return container;
+        }
+
+        function selectUser(container) {
+            if (activeContainer) {
+                activeContainer.classList.remove('selected', 'speaking', 'highlight');
+            }
+            activeContainer = container;
+            container.classList.add('selected');
+            if (fadeEnabled) {
+                container.classList.add('highlight');
+            }
+        }
+
+        // adjust number of users to match the input value
+        function updateUsers() {
+            const desired = parseInt(userCountInput.value, 10) || 0;
+            const current = usersContainer.children.length;
+            if (desired > current) {
+                for (let i = 0; i < desired - current; i++) {
+                    createAvatar();
+                }
+            } else if (desired < current) {
+                // remove extras from the end
+                for (let i = 0; i < current - desired; i++) {
+                    const last = usersContainer.lastElementChild;
+                    if (last === activeContainer) {
+                        activeContainer = null;
+                    }
+                    usersContainer.removeChild(last);
+                }
+                // if the active user was removed and there are still avatars, pick the first one
+                if (!activeContainer && usersContainer.children.length > 0) {
+                    selectUser(usersContainer.children[0]);
+                }
+            }
+        }
+
+        addBtn.addEventListener('click', updateUsers);
+        settingsToggle.addEventListener('click', () => {
+            settingsPanel.classList.toggle('open');
+        });
+        fadeToggle.addEventListener('change', () => {
+            fadeEnabled = fadeToggle.checked;
+            // update currently selected avatar appearance
+            if (activeContainer) {
+                activeContainer.classList.remove('highlight');
+                if (fadeEnabled) {
+                    activeContainer.classList.add('highlight');
+                }
+            }
+        });
+
+        // create initial avatar (will be auto‑selected)
+        createAvatar();
+
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
+                });
+
+                startBtn.style.display = 'none';
+                const audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+
+                const filter = audioContext.createBiquadFilter();
+                filter.type = "highpass";
+                filter.frequency.value = 150;
+
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+
+                source.connect(filter);
+                filter.connect(analyser);
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                function detectVoice() {
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    let volume = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        volume += dataArray[i];
+                    }
+                    const averageVolume = volume / dataArray.length;
+
+                    if (activeContainer) {
+                        if (averageVolume > 25) {
+                            activeContainer.classList.add('speaking');
+                        } else {
+                            activeContainer.classList.remove('speaking');
+                        }
+                    }
+
+                    requestAnimationFrame(detectVoice);
+                }
+
+                detectVoice();
+            } catch (err) {
+                alert("Microphone access is required for this to work.");
+            }
+        }
+
+        startBtn.addEventListener('click', initAudio);
+    </script>
+</body>
+</html>
