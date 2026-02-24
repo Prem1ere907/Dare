@@ -1,0 +1,9 @@
+#How to publish project using terminal.
+
+git add .
+
+
+git commit -m "Update README and project files"
+
+
+git push
